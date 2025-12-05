@@ -9,7 +9,7 @@ st.title("🔥 Tool Tổng Hợp Học Phí")
 
 uploaded_files = st.file_uploader(
     "📁 Chọn file Excel",
-    type=["xlsx"],
+    type=["xls", "xlsx"],
     accept_multiple_files="directory"
 )
 
@@ -42,10 +42,15 @@ if st.button("🚀 Xử lý dữ liệu"):
         st.write(f"🔄 Đang xử lý {safe_name}")
 
         # Đọc Excel
-        xls = pd.ExcelFile(file_path, engine="openpyxl")
+        ext = os.path.splitext(file_path)[1].lower()
+
+        # Xác định engine
+        engine = "openpyxl" if ext == ".xlsx" else "xlrd"
+        
+        xls = pd.ExcelFile(file_path, engine=engine)
 
         for sheet_name in xls.sheet_names:
-            df = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
+            df = pd.read_excel(file_path, sheet_name=sheet_name, header=None, engine=engine)
 
             header_row = 9
             start_row = 11
