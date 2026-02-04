@@ -5,7 +5,7 @@ import glob
 import tempfile
 import io
 
-st.title("🔥 Tool Tổng Hợp Học Phí")
+st.title("🔥 Tool Tổng Hợp Học Phí Của Quỳnh")
 
 uploaded_files = st.file_uploader(
     "📁 Chọn file Excel",
@@ -92,3 +92,4 @@ if st.button("🚀 Xử lý dữ liệu"):
         file_name="TongHop_HocPhi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
