@@ -14,12 +14,9 @@ uploaded_files = st.file_uploader(
 )
 
 # =========================
-# HÀM MỚI: CHECK TÊN SHEET
+# HÀM CHECK TÊN SHEET ↔ A4
 # =========================
-def check_sheet_name(excel_wb):
-    """
-    Kiểm tra tên sheet có khớp với tên lớp trong ô A4 hay không
-    """
+def check_sheet_name(excel_wb, file_name):
     results = []
 
     for sheet_name in excel_wb.sheetnames:
@@ -28,21 +25,21 @@ def check_sheet_name(excel_wb):
 
         if not header_value:
             status = "ERROR"
-            message = f"Sheet {sheet_name}: Ô A4 đang trống hoặc không hợp lệ"
+            message = "Ô A4 đang trống hoặc không hợp lệ"
         else:
             header_str = str(header_value).strip()
             if sheet_name in header_str:
                 status = "OK"
-                message = f"Sheet {sheet_name}: Đã đúng tên lớp"
+                message = "Tên sheet khớp tên lớp"
             else:
                 status = "WARNING"
-                message = f"Sheet {sheet_name}: Cần sửa lại tên lớp"
+                message = "Tên sheet chưa khớp tên lớp"
 
         results.append({
+            "FileName": file_name,
             "SheetName": sheet_name,
-            "Header_A4": header_value,
-            "Status": status,
-            "Message": message
+            "Check_Ten_Lop": status,
+            "Ghi_Chu_Ten_Lop": message
         })
 
     return results
@@ -56,15 +53,14 @@ if st.button("🚀 Xử lý dữ liệu"):
 
     temp_dir = tempfile.mkdtemp()
     all_data = []
-    all_sheet_checks = []
+    all_checks = []
 
     for up_file in uploaded_files:
 
-        # Đọc binary
         content = up_file.read()
         safe_name = os.path.basename(up_file.name)
-
         file_path = os.path.join(temp_dir, safe_name)
+
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -74,7 +70,7 @@ if st.button("🚀 Xử lý dữ liệu"):
         engine = "openpyxl" if ext == ".xlsx" else "xlrd"
 
         # =========================
-        # PHẦN CŨ: ĐỌC DATA BẰNG PANDAS
+        # PHẦN CŨ: ĐỌC DỮ LIỆU HỌC PHÍ
         # =========================
         xls = pd.ExcelFile(file_path, engine=engine)
 
@@ -107,8 +103,9 @@ if st.button("🚀 Xử lý dữ liệu"):
 
             merged = pd.concat([fixed, keep], axis=1)
             merged.columns = range(merged.shape[1])
-            merged["SheetName"] = sheet_name
+
             merged["FileName"] = safe_name
+            merged["SheetName"] = sheet_name
 
             all_data.append(merged)
 
@@ -117,22 +114,32 @@ if st.button("🚀 Xử lý dữ liệu"):
         # =========================
         if ext == ".xlsx":
             excel_wb = load_workbook(file_path, data_only=True)
-            sheet_checks = check_sheet_name(excel_wb)
-
-            for r in sheet_checks:
-                r["FileName"] = safe_name
-
-            all_sheet_checks.extend(sheet_checks)
+            sheet_checks = check_sheet_name(excel_wb, safe_name)
+            all_checks.extend(sheet_checks)
 
     if not all_data:
         st.error("❌ Không có dữ liệu hợp lệ để tổng hợp")
         st.stop()
 
     # =========================
-    # GỘP DỮ LIỆU
+    # GỘP DỮ LIỆU HỌC PHÍ
     # =========================
     final_df = pd.concat(all_data, ignore_index=True)
-    check_df = pd.DataFrame(all_sheet_checks)
+
+    # =========================
+    # GỘP KẾT QUẢ CHECK VÀO TỪNG DÒNG
+    # =========================
+    check_df = pd.DataFrame(all_checks)
+
+    if not check_df.empty:
+        final_df = final_df.merge(
+            check_df,
+            on=["FileName", "SheetName"],
+            how="left"
+        )
+    else:
+        final_df["Check_Ten_Lop"] = ""
+        final_df["Ghi_Chu_Ten_Lop"] = ""
 
     st.success("🎉 Hoàn tất xử lý!")
 
@@ -141,9 +148,11 @@ if st.button("🚀 Xử lý dữ liệu"):
     # =========================
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        final_df.to_excel(writer, index=False, sheet_name="TongHopHocPhi")
-        if not check_df.empty:
-            check_df.to_excel(writer, index=False, sheet_name="CheckTenSheet")
+        final_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="TongHopHocPhi"
+        )
 
     buffer.seek(0)
 
@@ -153,16 +162,3 @@ if st.button("🚀 Xử lý dữ liệu"):
         file_name="TongHop_HocPhi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
-    # =========================
-    # HIỂN THỊ KẾT QUẢ CHECK
-    # =========================
-    if not check_df.empty:
-        st.subheader("📋 Kiểm tra tên sheet & tên lớp")
-        for _, r in check_df.iterrows():
-            if r["Status"] == "OK":
-                st.success(r["Message"])
-            elif r["Status"] == "WARNING":
-                st.warning(r["Message"])
-            else:
-                st.error(r["Message"])
